@@ -62,7 +62,11 @@ export const PROVIDERS = {
   // somewhere is CREDENTIAL_HOME — outside ./data, so `tar czf … data/` cannot capture it.
   codex: {
     label: 'Codex (OpenAI)', runtime: 'Codex CLI',
-    apiKeyEnv: 'CODEX_API_KEY', oauthEnv: null, credentialHomeEnv: 'CODEX_HOME'
+    apiKeyEnv: 'CODEX_API_KEY', oauthEnv: null, credentialHomeEnv: 'CODEX_HOME',
+    // The CLI signs itself in (`codex login --device-auth`) and keeps its own refreshable cache
+    // in CREDENTIAL_HOME, so a key filed with the app is one way to pay for jobs rather than the
+    // only one. Filing none is what lets a ChatGPT subscription be the account that pays.
+    keyOptional: true
   },
   // The plain-HTTPS providers — Anthropic, OpenAI, Gemini and any OpenAI-compatible endpoint.
   // Described once in core/providers.js so the phone's picker and this table cannot disagree.
@@ -302,7 +306,11 @@ export function isConnected() {
   if (cfg.provider === 'fixture') return true;
   if (cfg.authMode === 'profile') return true;
   const rec = authFor(cfg);
-  if (!rec) return !!providerMeta(cfg).keyOptional && !!baseUrlFor(cfg.provider, cfg);
+  const meta = providerMeta(cfg);
+  // keyOptional with nothing filed: an HTTP endpoint still needs somewhere to send the request,
+  // so it stays gated on a base URL. A runtime in the container is reachable by definition and
+  // has none — gating it on one would report every credential-free runtime as disconnected.
+  if (!rec) return !!meta.keyOptional && (!meta.http || !!baseUrlFor(cfg.provider, cfg));
   return !!decrypt(rec.data);
 }
 
